@@ -1,12 +1,10 @@
+from __future__ import annotations
+
 from collections.abc import Iterable
 import re
 
-from maa.agent.agent_server import AgentServer
-from maa.context import Context, JRecognitionType
-from maa.custom_recognition import CustomRecognition
-from maa.pipeline import JOCR
-
 from agent.conquest.tier_policy import EntryEvidence, is_safe_entry
+from agent.maa_compat import AgentServer, Context, CustomRecognition, JRecognitionType, JOCR
 from agent.runtime.commands import parse_json_object
 from agent.runtime.store import STORE
 from agent.session.config import ConquestTier

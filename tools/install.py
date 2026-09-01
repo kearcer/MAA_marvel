@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from pathlib import Path
 
+import json
 import shutil
 import sys
 
@@ -8,20 +11,30 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 try:
-    import jsonc
-except ModuleNotFoundError as e:
-    raise ImportError(
-        "Missing dependency 'json-with-comments' (imported as 'jsonc').\n"
-        f"Install it with:\n  {sys.executable} -m pip install json-with-comments\n"
-        "Or add it to your project's requirements."
-    ) from e
-
-try:
     from tools.configure import configure_ocr_model
+    from tools.validate_schema import load_jsonc, strip_jsonc_comments
 except ModuleNotFoundError:
     from configure import configure_ocr_model
+    from validate_schema import load_jsonc, strip_jsonc_comments
 
 from agent.runtime.task_cache import migrate_runtime_task_cache
+
+
+class _JsoncCompat:
+    @staticmethod
+    def load(stream):
+        return json.loads(strip_jsonc_comments(stream.read()))
+
+    @staticmethod
+    def loads(text: str):
+        return json.loads(strip_jsonc_comments(text))
+
+    @staticmethod
+    def dump(value, stream, **kwargs) -> None:
+        json.dump(value, stream, **kwargs)
+
+
+jsonc = _JsoncCompat()
 
 
 def get_dotnet_platform_tag(os_name: str, arch: str) -> str:
@@ -106,8 +119,7 @@ def install_project_files(
     )
 
     interface_path = destination / "interface.json"
-    with interface_path.open("r", encoding="utf-8") as stream:
-        interface = jsonc.load(stream)
+    interface = load_jsonc(interface_path)
     interface["version"] = release_version
     agent_bundle = source_root / "agent_dist" / "MAA_marvel_agent"
     if os_name != "android" and agent_bundle.exists():

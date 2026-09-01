@@ -1,9 +1,12 @@
-from dataclasses import dataclass, field
+from __future__ import annotations
+
+from dataclasses import field
 from datetime import date
 from enum import Enum
 from typing import Protocol
 from uuid import uuid4
 
+from agent.compat import dataclass
 from agent.session.config import SessionConfig, SnapMode
 
 

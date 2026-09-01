@@ -1,13 +1,13 @@
 import random
 import time
 
-from maa.agent.agent_server import AgentServer
-from maa.context import Context
-from maa.custom_recognition import CustomRecognition
+from agent.maa_compat import AgentServer, Context, CustomRecognition
 
+from agent.recognitions.card_selection import is_active_turn
 from agent.runtime.commands import parse_json_object
 from agent.runtime.store import STORE
-from agent.session.config import AfterRetreat, ConquestTier
+from agent.session.config import AfterRetreat, ConquestTier, GameMode
+from agent.session.state import SnapStage
 
 
 RNG = random.Random()
@@ -33,6 +33,8 @@ class SessionGate(CustomRecognition):
             matched = state.task_rewards_due(time.monotonic())
         elif command == "daily_routine_pending":
             matched = state.daily_routine_pending()
+        elif command == "is_ladder_mode":
+            matched = state.config.game_mode is GameMode.LADDER
         elif command == "should_retreat":
             matched = state.should_retreat()
         elif command in {"should_snap", "should_snap_first"}:

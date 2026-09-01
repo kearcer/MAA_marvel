@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import time
 from typing import Any, Callable
 
 import numpy as np
 
+from agent.compat import dataclass
 
 @dataclass(slots=True)
 class _TimingBucket:

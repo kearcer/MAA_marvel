@@ -11,7 +11,6 @@ from typing import Any
 from uuid import uuid4
 
 import numpy as np
-from PIL import Image
 
 from agent.session.state import SessionState
 
@@ -232,10 +231,15 @@ class RuntimeDiagnostics:
                 return incident_dir
             pixels = np.asarray(image)
             if pixels.ndim == 3 and pixels.shape[2] >= 3:
-                rgb = pixels[..., :3][..., ::-1]
-                Image.fromarray(rgb.astype(np.uint8), "RGB").save(
-                    incident_dir / "screenshot.png"
-                )
+                try:
+                    from PIL import Image
+
+                    rgb = pixels[..., :3][..., ::-1]
+                    Image.fromarray(rgb.astype(np.uint8), "RGB").save(
+                        incident_dir / "screenshot.png"
+                    )
+                except ImportError:
+                    np.save(incident_dir / "screenshot.npy", pixels)
             else:
                 np.save(incident_dir / "screenshot.npy", pixels)
             return incident_dir

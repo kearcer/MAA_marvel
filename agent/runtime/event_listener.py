@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from threading import Thread
 
-from maa.agent.agent_server import AgentServer
-from maa.context import Context, ContextEventSink
-from maa.event_sink import NotificationType
-from maa.tasker import Tasker, TaskerEventSink
+from agent.maa_compat import (
+    AgentServer,
+    Context,
+    ContextEventSink,
+    NotificationType,
+    Tasker,
+    TaskerEventSink,
+)
 
 from agent.runtime.diagnostics import DIAGNOSTICS
 from agent.runtime.store import STORE

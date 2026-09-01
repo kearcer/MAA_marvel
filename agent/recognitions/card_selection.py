@@ -1,16 +1,14 @@
+from __future__ import annotations
+
 from collections.abc import Iterable
-from dataclasses import dataclass
 import re
 import time
 from typing import Any, Callable
 
 import numpy as np
 
-from maa.agent.agent_server import AgentServer
-from maa.context import Context, JRecognitionType
-from maa.custom_recognition import CustomRecognition
-from maa.pipeline import JOCR
-
+from agent.compat import dataclass
+from agent.maa_compat import AgentServer, Context, CustomRecognition, JRecognitionType, JOCR
 from agent.strategies.ocr import CardCandidate, choose_card
 
 # 坐标均以 Maa 原生 1920×1080 横屏为基准。
@@ -762,24 +760,9 @@ def scan_battle_hand(
                 )
             )
 
-    # 即将空过时改用重叠窗口重新运行“检测 + 识别”。这比把整块卡图交给
-    # only_rec 更可靠：只有 OCR 真正检测到的小数字框才会成为候选。
-    window_results: list[tuple[Any, tuple[int, int, int, int]]] = []
-    for roi in HAND_COST_WINDOWS:
-        detail = context.run_recognition_direct(
-            JRecognitionType.OCR,
-            JOCR(roi=roi, threshold=0.20, order_by="Horizontal"),
-            image,
-        )
-        window_results.extend((result, roi) for result in _results(detail))
-    merged = _merge_cards(cards, _detect_cards(window_results, image))
-    if not sparse_hand and any(card.cost <= energy.value for card in merged):
-        return BattleHand(energy.value, merged, "window_path")
-
-    # 最后只探测已知数字左侧的费用角标。细字体 1/2 经常漏检，
-    # 但同一张卡右侧较大的战力数字仍会被识别，因此无需再次扫描整条手牌。
-    probe_results: list[tuple[Any, tuple[int, int, int, int]]] = []
-    for roi in _build_cost_probe_rois((*located_results, *window_results)):
+    cards: list[DetectedCard] = []
+    for badge in badges:
+        cost_started = time.perf_counter()
         detail = context.run_recognition_direct(
             JRecognitionType.OCR,
             JOCR(
@@ -822,11 +805,34 @@ def scan_battle_hand(
         if detected is not None:
             cards.append(detected)
 
+    if cards:
+        hand = BattleHand(energy.value, tuple(cards), "blue_badge_path")
+        if tracker is not None:
+            tracker.remember(image, badges, hand.cards)
+        return finish(hand)
+
+    # 蓝色定位命中但单徽章 OCR 全失效时，再用重叠窗口兜底一次。
+    window_results: list[tuple[Any, tuple[int, int, int, int]]] = []
+    for roi in HAND_COST_WINDOWS:
+        detail = context.run_recognition_direct(
+            JRecognitionType.OCR,
+            JOCR(roi=roi, threshold=0.20, order_by="Horizontal"),
+            image,
+        )
+        window_results.extend((result, roi) for result in _results(detail))
+
+    window_cards = _detect_cards(window_results, image)
+    if any(card.cost <= energy.value for card in window_cards):
+        hand = BattleHand(energy.value, window_cards, "window_path")
+        if tracker is not None:
+            tracker.remember(image, badges, hand.cards)
+        return finish(hand)
+
     hand = BattleHand(
         energy.value,
-        tuple(cards),
-        "blue_badge_path" if cards else "blue_badge_ocr_failed",
-        unresolved_badges=max(0, len(badges) - len(cards)),
+        (),
+        "blue_badge_ocr_failed",
+        unresolved_badges=len(badges),
     )
     if tracker is not None:
         tracker.remember(image, badges, hand.cards)

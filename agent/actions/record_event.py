@@ -1,8 +1,6 @@
 import time
 
-from maa.agent.agent_server import AgentServer
-from maa.context import Context
-from maa.custom_action import CustomAction
+from agent.maa_compat import AgentServer, Context, CustomAction
 
 from agent.runtime.commands import apply_event, parse_json_object
 from agent.runtime.store import STORE

@@ -1,13 +1,12 @@
+from __future__ import annotations
+
 from collections.abc import Iterable
 import re
 from typing import Any
 
 import numpy as np
 
-from maa.agent.agent_server import AgentServer
-from maa.context import Context, JRecognitionType
-from maa.custom_recognition import CustomRecognition
-from maa.pipeline import JOCR
+from agent.maa_compat import AgentServer, Context, CustomRecognition, JRecognitionType, JOCR
 
 
 # “查看所有每日任务”打开后的任务页采用居中的竖版布局。已完成任务会排在
@@ -145,7 +144,7 @@ class DailyTaskReward(CustomRecognition):
 
         inspected: list[dict[str, object]] = []
         for index, (digit_rois, row_box) in enumerate(
-            zip(DAILY_TASK_PROGRESS_ROIS, DAILY_TASK_ROW_BOXES, strict=True)
+            zip(DAILY_TASK_PROGRESS_ROIS, DAILY_TASK_ROW_BOXES)
         ):
             current_detail = context.run_recognition_direct(
                 JRecognitionType.OCR,

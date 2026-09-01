@@ -1,6 +1,8 @@
-from collections.abc import Iterable
-from dataclasses import dataclass
+from __future__ import annotations
 
+from collections.abc import Iterable
+
+from agent.compat import dataclass
 
 @dataclass(frozen=True, slots=True)
 class CardCandidate:

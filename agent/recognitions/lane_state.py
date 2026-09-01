@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 
+from agent.compat import dataclass
 
 # 玩家侧三个场地均使用固定 2x2 卡位。中心与落牌目标保持一致；卡位中心
 # 来自 1920x1080 横屏实机截图，刻意避开场地卡牌与底部手牌区域。

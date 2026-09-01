@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from agent.compat import dataclass
 
 
 @dataclass(frozen=True, slots=True)

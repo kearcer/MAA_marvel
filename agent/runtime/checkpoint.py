@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass, fields
+from dataclasses import fields
 import hashlib
 import json
 from pathlib import Path
 import time
 from typing import Any
 
+from agent.compat import dataclass
 from agent.session.config import ConquestTier, GameMode, SessionConfig
 from agent.session.state import SessionState
 

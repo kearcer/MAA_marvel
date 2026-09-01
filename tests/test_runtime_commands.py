@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from agent.actions.record_event import RecordEvent
 from agent.recognitions.session_gate import SessionGate
 from agent.runtime.commands import apply_event, parse_json_object
-from agent.runtime.store import RuntimeStore
+from agent.runtime.store import RuntimeStore, STORE
 from agent.session.config import ConquestTier
 from agent.session.state import StopReason
 

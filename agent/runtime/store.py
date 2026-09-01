@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from collections import deque
 from collections.abc import Mapping
 from threading import RLock
+
 import time
 from typing import Any
 

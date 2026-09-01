@@ -1,11 +1,11 @@
+from __future__ import annotations
+
 import random
 import time
 
 import numpy as np
 
-from maa.agent.agent_server import AgentServer
-from maa.context import Context
-from maa.custom_action import CustomAction
+from agent.maa_compat import AgentServer, Context, CustomAction
 
 from agent.recognitions.card_selection import (
     BattleHand,
@@ -15,8 +15,11 @@ from agent.recognitions.card_selection import (
     scan_battle_hand,
 )
 from agent.recognitions.lane_state import scan_lane_states
+from agent.runtime.diagnostics import DIAGNOSTICS
+from agent.runtime.performance import AdaptiveFrameWait, PerformanceTrace
 from agent.runtime.store import STORE
 from agent.session.config import LaneOrder, SnapMode
+from agent.session.state import SessionState
 from agent.strategies.ocr import CardCandidate, choose_card
 from agent.strategies.model import Point
 
@@ -44,6 +47,15 @@ SCAN_RETRY_DELAY_SECONDS = 0.12
 DETAIL_CLOSE_POINT = Point(358, 1201)
 DETAIL_CLOSE_DELAY_SECONDS = 0.5
 DIRECT_END_TURN_DELAY_SECONDS = 0.2
+PLAY_ACTIVITY_ROI = (500, 800, 1180, 250)
+DYNAMIC_WAIT_INITIAL_SECONDS = 0.04
+DYNAMIC_WAIT_MAXIMUM_SECONDS = 0.28
+DETAIL_CHANGE_TIMEOUT_SECONDS = 2.0
+DETAIL_CHANGE_MAX_POLLS = 12
+STRICT_NO_BADGE_GATE_TURN = 6
+NO_BADGE_END_TURN_CONFIRMATIONS = 4
+FINAL_NO_BADGE_SCAN_RETRIES = 4
+INACTIVE_SCAN_RETRIES = 4
 
 
 def lane_targets_for_order(order: LaneOrder) -> tuple[Point, ...]:
@@ -363,6 +375,14 @@ def _click_end_turn(
         return "placed"
     print("[MarvelPlayTurn] play_resolution=timeout", flush=True)
     return "timeout"
+
+
+def _wait_for_play_resolution(
+    context: Context,
+    controller: object,
+    performance: PerformanceTrace | None = None,
+) -> str:
+    return _click_end_turn(context, controller, performance)
 
 
 def _play_succeeded(

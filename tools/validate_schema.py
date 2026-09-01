@@ -4,20 +4,42 @@ import sys
 import tempfile
 import argparse
 from pathlib import Path
-from jsonschema import Draft7Validator, Draft202012Validator
-from jsonschema.exceptions import ValidationError
 
-try:
-    from referencing import Registry, Resource
-    from referencing.jsonschema import DRAFT202012, DRAFT7
-    import referencing.retrieval
+Draft7Validator = None
+Draft202012Validator = None
+RefResolver = None
+Registry = None
+Resource = None
+DRAFT202012 = None
+DRAFT7 = None
+HAS_REFERENCING = False
 
-    HAS_REFERENCING = True
-except ImportError:
-    # 如果没有 referencing 库，回退到旧的 RefResolver
-    from jsonschema import RefResolver
 
-    HAS_REFERENCING = False
+def _load_schema_dependencies():
+    global Draft7Validator, Draft202012Validator, RefResolver
+    global Registry, Resource, DRAFT202012, DRAFT7, HAS_REFERENCING
+    if Draft7Validator is not None:
+        return
+    from jsonschema import Draft7Validator as _Draft7Validator
+    from jsonschema import Draft202012Validator as _Draft202012Validator
+
+    Draft7Validator = _Draft7Validator
+    Draft202012Validator = _Draft202012Validator
+    try:
+        from referencing import Registry as _Registry, Resource as _Resource
+        from referencing.jsonschema import DRAFT202012 as _DRAFT202012, DRAFT7 as _DRAFT7
+        import referencing.retrieval  # noqa: F401
+
+        Registry = _Registry
+        Resource = _Resource
+        DRAFT202012 = _DRAFT202012
+        DRAFT7 = _DRAFT7
+        HAS_REFERENCING = True
+    except ImportError:
+        from jsonschema import RefResolver as _RefResolver
+
+        RefResolver = _RefResolver
+        HAS_REFERENCING = False
 
 
 def strip_jsonc_comments(text):
@@ -92,6 +114,7 @@ def load_jsonc(file_path):
 
 def get_validator_class(schema):
     """根据 schema 的 $schema 字段选择合适的验证器"""
+    _load_schema_dependencies()
     schema_uri = schema.get("$schema", "")
 
     if "draft-07" in schema_uri or "draft/07" in schema_uri:

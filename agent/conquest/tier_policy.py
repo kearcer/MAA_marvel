@@ -1,6 +1,8 @@
-from collections.abc import Mapping
-from dataclasses import dataclass
+from __future__ import annotations
 
+from collections.abc import Mapping
+
+from agent.compat import dataclass
 from agent.session.config import ConquestTier
 
 

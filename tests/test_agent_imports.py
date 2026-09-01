@@ -5,9 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from maa.agent.agent_server import AgentServer
-from maa.event_sink import NotificationType
-
+from agent.maa_compat import AgentServer, NotificationType
 from agent.runtime.diagnostics import RuntimeDiagnostics
 from agent.runtime.event_listener import MarvelContextEventSink, _capture_async
 from agent.session.config import SessionConfig

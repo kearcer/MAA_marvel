@@ -1,7 +1,6 @@
 import sys
 
-from maa.agent.agent_server import AgentServer
-from maa.toolkit import Toolkit
+from agent.maa_compat import AgentServer, Toolkit
 
 # 这些模块虽然没有在 main.py 中直接调用，但导入时会执行
 # @AgentServer.custom_action / custom_recognition 装饰器，从而完成注册。
