@@ -4,6 +4,7 @@ from agent.session.config import (
     AfterRetreat,
     ConquestTier,
     LaneOrder,
+    PlayStrategy,
     SessionConfig,
     SnapMode,
 )
@@ -12,6 +13,7 @@ from agent.session.config import (
 class SessionConfigTests(unittest.TestCase):
     def test_defaults_match_approved_design(self) -> None:
         config = SessionConfig.from_mapping({})
+        self.assertEqual(config.play_strategy, PlayStrategy.OCR)
         self.assertEqual(config.lane_order, LaneOrder.LEFT_TO_RIGHT)
         self.assertEqual(config.max_tier, ConquestTier.PROVING_GROUNDS)
         self.assertEqual(config.reserve_silver_tickets, 1)
@@ -29,6 +31,7 @@ class SessionConfigTests(unittest.TestCase):
         config = SessionConfig.from_mapping(
             {
                 "lane_order": "right_to_left",
+                "play_strategy": "random",
                 "max_tier": "silver",
                 "reserve_silver_tickets": 2,
                 "reserve_gold_tickets": 3,
@@ -44,6 +47,7 @@ class SessionConfigTests(unittest.TestCase):
             }
         )
         self.assertEqual(config.lane_order, LaneOrder.RIGHT_TO_LEFT)
+        self.assertEqual(config.play_strategy, PlayStrategy.RANDOM)
         self.assertEqual(config.max_tier, ConquestTier.SILVER)
         self.assertEqual(config.reserve_silver_tickets, 2)
         self.assertEqual(config.reserve_gold_tickets, 3)

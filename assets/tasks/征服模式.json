@@ -13,6 +13,7 @@
             "description": "仅支持国服安卓端 1920×1080 横屏；不会购买门票或消耗金块。",
             "option": [
                 "征服-选择卡组",
+                "征服-出牌策略",
                 "征服-放牌场地顺序",
                 "征服-最高档位",
                 "征服-保留门票数",
@@ -104,6 +105,59 @@
                     }
                 }
             }
+        },
+        "征服-出牌策略": {
+            "type": "select",
+            "label": "出牌策略",
+            "description": "OCR 会识别能量和手牌费用；随机会有限随机拖动手牌；阿加莎不会主动拖牌。",
+            "default_case": "ocr",
+            "cases": [
+                {
+                    "name": "ocr",
+                    "label": "OCR 智能选牌",
+                    "pipeline_override": {
+                        "Config_PlayStrategy": {
+                            "action": {
+                                "param": {
+                                    "custom_action_param": {
+                                        "play_strategy": "ocr"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "random",
+                    "label": "随机出牌",
+                    "pipeline_override": {
+                        "Config_PlayStrategy": {
+                            "action": {
+                                "param": {
+                                    "custom_action_param": {
+                                        "play_strategy": "random"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "agatha",
+                    "label": "阿加莎托管",
+                    "pipeline_override": {
+                        "Config_PlayStrategy": {
+                            "action": {
+                                "param": {
+                                    "custom_action_param": {
+                                        "play_strategy": "agatha"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
         },
         "征服-放牌场地顺序": {
             "type": "select",

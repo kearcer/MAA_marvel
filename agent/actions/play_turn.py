@@ -12,13 +12,14 @@ from agent.recognitions.card_selection import (
     DetectedCard,
     HandFrameTracker,
     MINIMUM_CONFIDENCE,
+    is_active_turn,
     scan_battle_hand,
 )
 from agent.recognitions.lane_state import scan_lane_states
 from agent.runtime.diagnostics import DIAGNOSTICS
 from agent.runtime.performance import AdaptiveFrameWait, PerformanceTrace
 from agent.runtime.store import STORE
-from agent.session.config import LaneOrder, SnapMode
+from agent.session.config import LaneOrder, PlayStrategy, SnapMode
 from agent.session.state import SessionState
 from agent.strategies.ocr import CardCandidate, choose_card
 from agent.strategies.model import Point
@@ -27,8 +28,18 @@ from agent.strategies.model import Point
 # Maa 原生 1920×1080 横屏坐标。三个落点位于玩家侧场地区域，
 # 避开场地说明文字和右下角结束回合按钮。
 LANE_TARGETS = (Point(710, 730), Point(960, 730), Point(1210, 730))
+RANDOM_HAND_TARGETS = (
+    Point(560, 930),
+    Point(700, 930),
+    Point(840, 930),
+    Point(980, 930),
+    Point(1120, 930),
+    Point(1260, 930),
+    Point(1400, 930),
+)
 # 单回合安全上限。正常一回合不可能成功打出 12 张牌；此限制用于防止异常循环。
 MAX_SUCCESSFUL_PLAYS = 6
+MAX_RANDOM_SWIPES = 8
 # 500ms 会被游戏识别成长按并打开卡牌详情；快速拖动才会进入放牌状态。
 SWIPE_DURATION_MS = 280
 # 同一场地至少连续证明两次无法放牌，才在本回合将其屏蔽。一次失败可能只是
@@ -97,6 +108,10 @@ def _capture_frame(
     if performance is not None:
         performance.record(f"{phase}.screencap", time.perf_counter() - started)
     return image
+
+
+def _zero_energy_visible(context: Context, image: object) -> bool:
+    return _recognition_hit(context.run_recognition("公共-零能量", image))
 
 
 def _wait_for_visual_change(
@@ -497,6 +512,10 @@ class PlayTurn(CustomAction):
         if state.should_stop(time.monotonic()):
             return True
         controller = context.tasker.controller
+        if state.config.play_strategy is PlayStrategy.AGATHA:
+            return self._run_agatha(context, argv, state, controller, performance)
+        if state.config.play_strategy is PlayStrategy.RANDOM:
+            return self._run_random(context, argv, state, controller, performance)
 
         successful_plays = 0
         no_more_playable_cards = False
@@ -798,3 +817,84 @@ class PlayTurn(CustomAction):
             getattr(argv, "node_name", "公共-执行出牌"),
             ["公共-出牌后状态"],
         )
+
+    def _run_agatha(
+        self,
+        context: Context,
+        argv: CustomAction.RunArg,
+        state: SessionState,
+        controller: object,
+        performance: PerformanceTrace,
+    ) -> bool:
+        image = _capture_frame(controller, performance, "agatha")
+        if is_active_turn(context, image):
+            state.allow_end_turn("agatha_strategy")
+            performance.event("agatha", result="end_turn_allowed")
+            return True
+        performance.event("agatha", result="inactive_turn")
+        return context.override_next(
+            getattr(argv, "node_name", "公共-执行出牌"),
+            ["公共-出牌后状态"],
+        )
+
+    def _run_random(
+        self,
+        context: Context,
+        argv: CustomAction.RunArg,
+        state: SessionState,
+        controller: object,
+        performance: PerformanceTrace,
+    ) -> bool:
+        hand_targets = random.sample(RANDOM_HAND_TARGETS, k=len(RANDOM_HAND_TARGETS))
+        attempts = 0
+        for start in hand_targets:
+            if attempts >= MAX_RANDOM_SWIPES:
+                break
+            image = _capture_frame(controller, performance, "random")
+            if _zero_energy_visible(context, image):
+                state.allow_end_turn("energy_zero")
+                performance.event("random", result="energy_zero")
+                return True
+            if not is_active_turn(context, image):
+                performance.event("random", result="inactive_turn")
+                return context.override_next(
+                    getattr(argv, "node_name", "公共-执行出牌"),
+                    ["公共-出牌后状态"],
+                )
+            for lane in lane_targets_for_order(state.config.lane_order):
+                if attempts >= MAX_RANDOM_SWIPES:
+                    break
+                attempts += 1
+                swipe_started = time.perf_counter()
+                job = controller.post_swipe(
+                    start.x,
+                    start.y,
+                    lane.x,
+                    lane.y,
+                    SWIPE_DURATION_MS,
+                ).wait()
+                performance.record("random.swipe", time.perf_counter() - swipe_started)
+                if not job.succeeded:
+                    performance.event(
+                        "random",
+                        result="controller_failed",
+                        attempts=attempts,
+                    )
+                    return False
+                resolution = _wait_for_play_resolution(
+                    context,
+                    controller,
+                    performance,
+                )
+                performance.event(
+                    "random",
+                    start=(start.x, start.y),
+                    lane=(lane.x, lane.y),
+                    resolution=resolution,
+                    attempts=attempts,
+                )
+                if resolution == "placed":
+                    break
+        state.allow_end_turn("random_strategy_exhausted")
+        performance.event("random", result="attempts_exhausted", attempts=attempts)
+        return True

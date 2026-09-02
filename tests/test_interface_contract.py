@@ -48,6 +48,7 @@ class InterfaceContractTests(unittest.TestCase):
         options = self.task_file["option"]
         expected = {
             "征服-选择卡组",
+            "征服-出牌策略",
             "征服-放牌场地顺序",
             "征服-最高档位",
             "征服-保留门票数",
@@ -91,6 +92,13 @@ class InterfaceContractTests(unittest.TestCase):
                 deck_pattern.replace("{卡组名称}", "测试卡组"),
                 "测试卡组",
             )
+        )
+        self.assertEqual(
+            options["征服-出牌策略"]["default_case"], "ocr"
+        )
+        self.assertEqual(
+            [case["name"] for case in options["征服-出牌策略"]["cases"]],
+            ["ocr", "random", "agatha"],
         )
         self.assertEqual(
             options["征服-放牌场地顺序"]["default_case"], "left_to_right"

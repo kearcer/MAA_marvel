@@ -675,6 +675,49 @@ class OcrAdapterTests(unittest.TestCase):
         self.assertEqual(state.end_turn_reason, "energy_zero")
         self.assertEqual(context.controller.swipes, [])
 
+    def test_agatha_strategy_only_opens_end_turn_gate(self) -> None:
+        state = STORE.configure({"play_strategy": "agatha"}, now=0.0)
+        context = FakePlayContext(
+            detail_match=SimpleNamespace(hit=True, box=(1580, 900, 340, 180))
+        )
+        with patch(
+            "agent.actions.play_turn._capture_frame",
+            return_value=mark_active_turn(np.zeros((1080, 1920, 3), dtype=np.uint8)),
+        ):
+            self.assertTrue(
+                PlayTurn().run(
+                    context,
+                    SimpleNamespace(node_name="公共-执行出牌"),
+                )
+            )
+        self.assertEqual(context.controller.swipes, [])
+        self.assertTrue(state.end_turn_allowed)
+        self.assertEqual(state.end_turn_reason, "agatha_strategy")
+
+    def test_random_strategy_uses_limited_blind_swipes_then_opens_gate(self) -> None:
+        state = STORE.configure({"play_strategy": "random"}, now=0.0)
+        context = FakePlayContext(
+            detail_match=SimpleNamespace(hit=True, box=(1580, 900, 340, 180))
+        )
+        image = mark_active_turn(np.zeros((1080, 1920, 3), dtype=np.uint8))
+        with (
+            patch("agent.actions.play_turn._capture_frame", return_value=image),
+            patch("agent.actions.play_turn._zero_energy_visible", return_value=False),
+            patch(
+                "agent.actions.play_turn._wait_for_play_resolution",
+                return_value="ready",
+            ),
+        ):
+            self.assertTrue(
+                PlayTurn().run(
+                    context,
+                    SimpleNamespace(node_name="公共-执行出牌"),
+                )
+            )
+        self.assertEqual(len(context.controller.swipes), 8)
+        self.assertTrue(state.end_turn_allowed)
+        self.assertEqual(state.end_turn_reason, "random_strategy_exhausted")
+
     def test_four_no_badge_frames_open_end_turn_gate(self) -> None:
         state = STORE.configure({"play_strategy": "ocr"}, now=0.0)
         state.begin_turn(1)
