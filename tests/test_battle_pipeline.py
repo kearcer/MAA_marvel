@@ -48,6 +48,7 @@ class BattlePipelineTests(unittest.TestCase):
             "公共-执行出牌",
             "公共-SNAP判断",
             "公共-点击SNAP",
+            "公共-放置中等待",
             "公共-放置中状态",
             "公共-结束回合",
             "公共-等待对手",
@@ -339,9 +340,12 @@ class BattlePipelineTests(unittest.TestCase):
     def test_post_play_state_router_handles_end_turn_and_transitions(self) -> None:
         next_nodes = self.nodes["公共-出牌后状态"]["next"]
         self.assertEqual(next_nodes[0], "征服-每日经验上限")
-        self.assertEqual(next_nodes[1], "公共-结束回合门禁")
-        self.assertEqual(next_nodes[2], "公共-继续出牌门禁")
+        self.assertEqual(next_nodes[1], "公共-放置中等待")
+        self.assertEqual(next_nodes[2], "公共-结束回合门禁")
+        self.assertEqual(next_nodes[3], "公共-继续出牌门禁")
         self.assertEqual(self.nodes["公共-出牌后状态"]["rate_limit"], 200)
+        self.assertEqual(self.nodes["公共-放置中等待"]["post_delay"], 500)
+        self.assertEqual(self.nodes["公共-放置中等待"]["next"], ["公共-出牌后状态"])
         self.assertIn("公共-战斗继续", next_nodes)
         self.assertIn("公共-新回合", next_nodes)
         self.assertNotIn("公共-结束回合", self.nodes["公共-等待新状态"]["next"])

@@ -826,11 +826,20 @@ class OcrAdapterTests(unittest.TestCase):
         state = STORE.configure({"play_strategy": "ocr"}, now=0.0)
         active = mark_active_turn(np.zeros((1080, 1920, 3), dtype=np.uint8))
         self.assertIs(type(is_active_turn_frame(active)), bool)
+        placing = SimpleNamespace(
+            hit=True,
+            box=(1580, 900, 340, 180),
+        )
+        not_placing = SimpleNamespace(hit=False, box=None)
+        end_turn_text = SimpleNamespace(
+            hit=True,
+            box=(1580, 900, 340, 180),
+        )
         context = FakePlayContext(
-            detail_match=SimpleNamespace(
-                hit=True,
-                box=(1580, 900, 340, 180),
-            )
+            detail_match={
+                "公共-放置中状态": not_placing,
+                "公共-结束回合文字": end_turn_text,
+            }
         )
         argv = SimpleNamespace(
             custom_recognition_param='{"command":"can_end_turn"}',
@@ -842,17 +851,30 @@ class OcrAdapterTests(unittest.TestCase):
         allowed = SessionGate().analyze(context, argv)
         inactive = SessionGate().analyze(
             FakePlayContext(
-                detail_match=SimpleNamespace(hit=False, box=None)
+                detail_match={
+                    "公共-放置中状态": not_placing,
+                    "公共-结束回合文字": SimpleNamespace(hit=False, box=None),
+                }
             ),
             SimpleNamespace(
                 custom_recognition_param='{"command":"can_end_turn"}',
                 image=active,
             ),
         )
+        still_placing = SessionGate().analyze(
+            FakePlayContext(
+                detail_match={
+                    "公共-放置中状态": placing,
+                    "公共-结束回合文字": end_turn_text,
+                }
+            ),
+            argv,
+        )
 
         self.assertIsNone(denied.box)
         self.assertIsNotNone(allowed.box)
         self.assertIsNone(inactive.box)
+        self.assertIsNone(still_placing.box)
 
     def test_active_turn_uses_text_to_separate_ready_battle_button(self) -> None:
         purple_button = mark_active_turn(

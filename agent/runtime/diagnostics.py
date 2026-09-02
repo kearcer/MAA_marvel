@@ -19,6 +19,55 @@ INCIDENT_ROOT = Path("debug") / "incidents"
 EVENT_LOG = Path("debug") / "runtime-events.jsonl"
 
 
+def _short_text(value: Any, limit: int = 160) -> str:
+    text = str(value).replace("\n", " ").replace("\r", " ").strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3] + "..."
+
+
+def _compact_detail(detail: Any) -> str:
+    if not isinstance(detail, dict):
+        return "" if detail is None else f" detail={_short_text(detail)}"
+    keys = (
+        "entry",
+        "task_id",
+        "notification",
+        "attempts",
+        "elapsed_ms",
+        "last_error",
+        "capture_image_error",
+    )
+    parts = [
+        f"{key}={_short_text(detail[key])}"
+        for key in keys
+        if detail.get(key) not in (None, "")
+    ]
+    return "" if not parts else " " + " ".join(parts)
+
+
+def _stdout_line(payload: dict[str, Any]) -> str | None:
+    event = payload["event"]
+    detail = payload.get("detail")
+    if event != "incident":
+        if event != "task_finished" or not isinstance(detail, dict):
+            return None
+        if detail.get("notification") != "Failed":
+            return None
+    prefix = "MarvelRuntimeIssue"
+    parts = [
+        f"event={event}",
+        f"source={payload['source']}",
+        f"reason={payload['reason']}",
+    ]
+    if payload.get("node"):
+        parts.append(f"node={_short_text(payload['node'])}")
+    task = payload.get("task") or {}
+    if task.get("entry"):
+        parts.append(f"entry={_short_text(task['entry'])}")
+    return f"[{prefix}] {' '.join(parts)}{_compact_detail(detail)}"
+
+
 def _json_value(value: Any) -> Any:
     if is_dataclass(value):
         return _json_value(asdict(value))
@@ -179,7 +228,9 @@ class RuntimeDiagnostics:
             detail=detail,
         )
         encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        print(f"[MarvelRuntimeEvent] {encoded}", flush=True)
+        stdout_line = _stdout_line(payload)
+        if stdout_line is not None:
+            print(stdout_line, flush=True)
         try:
             EVENT_LOG.parent.mkdir(parents=True, exist_ok=True)
             with EVENT_LOG.open("a", encoding="utf-8") as stream:

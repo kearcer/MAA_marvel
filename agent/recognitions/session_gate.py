@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import random
 import time
 
@@ -11,6 +13,20 @@ from agent.session.state import SnapStage
 
 
 RNG = random.Random()
+
+
+def _recognition_hit(detail: object | None) -> bool:
+    return bool(
+        detail is not None
+        and getattr(detail, "hit", False)
+        and getattr(detail, "box", None) is not None
+    )
+
+
+def _is_placing(context: Context, image: object) -> bool:
+    return _recognition_hit(
+        context.run_recognition("公共-放置中状态", image)
+    )
 
 
 @AgentServer.custom_recognition("MarvelSessionGate")
@@ -54,10 +70,15 @@ class SessionGate(CustomRecognition):
         elif command == "can_end_turn":
             # 内存许可必须与当前截图仍为可操作回合同时成立。这样 SNAP 动画、
             # 回合切换或 Agent 重启都不能沿用一份过期许可误点按钮；同时用
-            # “结束回合”文字排除同为紫色按钮的“准备战斗？”。
-            matched = state.end_turn_allowed and is_active_turn(
-                context,
-                argv.image,
+            # “结束回合”文字排除同为紫色按钮的“准备战斗？”。“放置中”
+            # 是拖牌结算动画，必须等它结束再放行给点击节点。
+            matched = (
+                state.end_turn_allowed
+                and not _is_placing(context, argv.image)
+                and is_active_turn(
+                    context,
+                    argv.image,
+                )
             )
         elif command == "must_continue_playing":
             matched = (

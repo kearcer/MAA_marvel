@@ -1,5 +1,8 @@
 import importlib
+import io
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -44,6 +47,42 @@ class AgentImportTests(unittest.TestCase):
         self.assertIsNone(args[1])
         self.assertIsNot(kwargs["image"], frame)
         np.testing.assert_array_equal(kwargs["image"], frame)
+
+    def test_async_incident_capture_reports_cached_frame_failure_once(self) -> None:
+        controller = MagicMock()
+        controller.cached_image.copy.side_effect = RuntimeError(
+            "Failed to get cached image."
+        )
+
+        class ImmediateThread:
+            def __init__(self, *, target, args, kwargs, **_options) -> None:
+                self.target = target
+                self.args = args
+                self.kwargs = kwargs
+
+            def start(self) -> None:
+                self.target(*self.args, **self.kwargs)
+
+        with (
+            patch("agent.runtime.event_listener.Thread", ImmediateThread),
+            patch("agent.runtime.event_listener.DIAGNOSTICS.capture") as capture,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            _capture_async(
+                controller,
+                None,
+                source="pipeline",
+                reason="pipeline_node_failed",
+                detail={"task_id": 7},
+            )
+
+        self.assertNotIn("cached_image_failed", stdout.getvalue())
+        capture.assert_called_once()
+        self.assertIsNone(capture.call_args.kwargs["image"])
+        self.assertEqual(
+            capture.call_args.kwargs["detail"]["capture_image_error"],
+            "Failed to get cached image.",
+        )
 
     def test_context_sink_captures_only_final_pipeline_failure(self) -> None:
         sink = MarvelContextEventSink()
@@ -102,6 +141,24 @@ class AgentImportTests(unittest.TestCase):
             }.issubset(AgentServer._custom_recognition_holder)
         )
 
+    def test_main_starts_agent_server_with_socket_id(self) -> None:
+        main_module = importlib.import_module("agent.main")
+        with (
+            patch("agent.main.Toolkit.init_option") as init_option,
+            patch("agent.main.migrate_runtime_task_cache") as migrate,
+            patch("agent.main.AgentServer.start_up") as start_up,
+            patch("agent.main.AgentServer.join") as join,
+            patch("agent.main.AgentServer.shut_down") as shut_down,
+            patch("sys.argv", ["python", "-m", "agent.main", "socket-1"]),
+        ):
+            main_module.main()
+
+        init_option.assert_called_once_with("./")
+        migrate.assert_called_once()
+        start_up.assert_called_once_with("socket-1")
+        join.assert_called_once()
+        shut_down.assert_called_once()
+
     def test_diagnostics_reuses_root_task_run_id_for_session(self) -> None:
         diagnostics = RuntimeDiagnostics()
         diagnostics.begin_task(7, "征服-任务入口", "uuid", "hash")
@@ -117,6 +174,56 @@ class AgentImportTests(unittest.TestCase):
 
         self.assertIsNotNone(started["run_id"])
         self.assertEqual(state.run_id, started["run_id"])
+
+    def test_diagnostics_stdout_is_compact_but_file_keeps_full_event(self) -> None:
+        diagnostics = RuntimeDiagnostics()
+        diagnostics.begin_task(7, "寰佹湇-浠诲姟鍏ュ彛", "uuid", "hash")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            event_log = Path(temp_dir) / "runtime-events.jsonl"
+            with (
+                patch("agent.runtime.diagnostics.EVENT_LOG", new=event_log),
+                patch("sys.stdout", new_callable=io.StringIO) as stdout,
+            ):
+                diagnostics.emit(
+                    None,
+                    event="incident",
+                    source="warmup",
+                    reason="screencap_warmup_failed",
+                    node="寰佹湇-浠诲姟鍏ュ彛",
+                    detail={
+                        "attempts": 20,
+                        "elapsed_ms": 20000,
+                        "last_error": "empty image",
+                    },
+                )
+
+            output = stdout.getvalue()
+            self.assertIn("[MarvelRuntimeIssue]", output)
+            self.assertIn("reason=screencap_warmup_failed", output)
+            self.assertIn("last_error=empty image", output)
+            self.assertNotIn('"recent_nodes"', output)
+            self.assertIn('"recent_nodes"', event_log.read_text("utf-8"))
+
+    def test_diagnostics_keeps_normal_events_off_stdout(self) -> None:
+        diagnostics = RuntimeDiagnostics()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            event_log = Path(temp_dir) / "runtime-events.jsonl"
+            with (
+                patch("agent.runtime.diagnostics.EVENT_LOG", new=event_log),
+                patch("sys.stdout", new_callable=io.StringIO) as stdout,
+            ):
+                diagnostics.emit(
+                    None,
+                    event="task_started",
+                    source="framework",
+                    reason="task_starting",
+                    detail={"entry": "寰佹湇-浠诲姟鍏ュ彛"},
+                )
+
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertIn('"task_started"', event_log.read_text("utf-8"))
 
 
 if __name__ == "__main__":

@@ -2,8 +2,7 @@ import sys
 
 from agent.maa_compat import AgentServer, Toolkit
 
-# 这些模块虽然没有在 main.py 中直接调用，但导入时会执行
-# @AgentServer.custom_action / custom_recognition 装饰器，从而完成注册。
+# Imported for decorator registration.
 from agent.actions import (
     configure_session,
     play_turn,
@@ -23,17 +22,31 @@ from agent.recognitions import (
 )
 
 
+def _short_error(error: BaseException) -> str:
+    return str(error).replace("\n", " ").replace("\r", " ").strip()[:160]
+
+
 def main() -> None:
-    """启动 AgentServer，并通过 socket_id 与 MaaFramework 客户端通信。"""
-    Toolkit.init_option("./")
-    migrate_runtime_task_cache()
-    if len(sys.argv) < 2:
-        raise SystemExit("Usage: python -m agent.main <socket_id>")
-    # MFAAvalonia 启动 Agent 时会把通信标识符放在最后一个命令行参数中。
-    AgentServer.start_up(sys.argv[-1])
-    # join() 会持续等待客户端下发 CustomAction / CustomRecognition 请求。
-    AgentServer.join()
-    AgentServer.shut_down()
+    """Start AgentServer with the socket id passed by MaaFramework."""
+    started = False
+    try:
+        Toolkit.init_option("./")
+        migrate_runtime_task_cache()
+        if len(sys.argv) < 2:
+            raise SystemExit("Usage: python -m agent.main <socket_id>")
+        AgentServer.start_up(sys.argv[-1])
+        started = True
+        AgentServer.join()
+    except BaseException as error:
+        print(
+            "[MarvelRuntimeIssue] event=agent_failed source=agent "
+            f"reason={type(error).__name__} error={_short_error(error)}",
+            flush=True,
+        )
+        raise
+    finally:
+        if started:
+            AgentServer.shut_down()
 
 
 if __name__ == "__main__":

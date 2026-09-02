@@ -28,6 +28,12 @@ def _state():
     return STORE.state_or_none()
 
 
+def _detail_with_capture_error(detail, error):
+    values = dict(detail) if isinstance(detail, dict) else {}
+    values["capture_image_error"] = str(error)
+    return values
+
+
 def _capture_async(controller, state, **kwargs) -> None:
     # Context/Tasker event callbacks expose a temporary controller proxy.  The
     # proxy identifier becomes invalid as soon as the callback returns, so it
@@ -38,10 +44,7 @@ def _capture_async(controller, state, **kwargs) -> None:
     try:
         image = controller.cached_image.copy()
     except Exception as error:
-        print(
-            f"[MarvelRuntimeEvent] cached_image_failed error={error}",
-            flush=True,
-        )
+        kwargs["detail"] = _detail_with_capture_error(kwargs.get("detail"), error)
     Thread(
         target=DIAGNOSTICS.capture,
         args=(None, state),
